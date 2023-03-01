@@ -1,6 +1,6 @@
 # FFIChecker: A Static Analysis Tool For Detecting Memory Management Bugs Between Rust and C/C++
 
-[![build](https://github.com/lizhuohua/rust-ffi-checker/actions/workflows/build.yml/badge.svg)](https://github.com/lizhuohua/rust-ffi-checker/actions/workflows/build.yml)
+[![Build](https://github.com/gradual-verification/rust-ffi-checker/actions/workflows/build.yml/badge.svg)](https://github.com/gradual-verification/rust-ffi-checker/actions/workflows/build.yml)
 
 This tool generates and analyzes LLVM bitcode to detect potential bugs caused by incorrect use of Rust FFI.
 
