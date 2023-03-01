@@ -8,6 +8,7 @@ on:
       - "Cargo.toml"
   pull_request:
     branches: [ main ]
+    paths:
       - "src/**"
       - "Cargo.toml"
 
