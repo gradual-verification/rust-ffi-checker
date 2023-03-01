@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use rustc_middle::hir::map::Map;
 
 pub struct EntryCollectorCallbacks {
     // If we are compiling a dependency crate, only collect FFI functions
@@ -40,11 +41,12 @@ impl rustc_driver::Callbacks for EntryCollectorCallbacks {
         queries
             .global_ctxt()
             .unwrap()
-            .peek_mut()
             .enter(|tcx| self.run_analysis(compiler, tcx));
         Compilation::Continue
     }
 }
+
+
 
 impl EntryCollectorCallbacks {
     fn run_analysis<'tcx, 'compiler>(
@@ -71,14 +73,17 @@ impl EntryCollectorCallbacks {
         }
 
         // Initialize global analysis context
-        let hir = tcx.hir();
-        for item in hir.items() {
+        let hir:Map<'_> = tcx.hir();
+        for item_id in hir.items() {
+            let item = hir.item(item_id);
+            let def_id = item.hir_id().owner.def_id.to_def_id();
+            let visibility = tcx.visibility(def_id);
             // If it is a top crate, collect all the public functions/methods
             if !self.is_dependency {
                 match &item.kind {
                     rustc_hir::ItemKind::Fn { .. } => {
-                        if item.vis.node.is_pub() {
-                            debug!("Public Fn: {:?}, {:?}", item.def_id, item.ident);
+                        if visibility.is_public() {
+                            debug!("Public Fn: {:?}, {:?}", def_id, item.ident);
                             pub_funcs.insert(String::from(&*(item.ident.as_str())));
                         }
                     }
@@ -88,8 +93,10 @@ impl EntryCollectorCallbacks {
                                 // The visibility of an `Impl` is stored in `ImplItem`, so we get it through its id
                                 let impl_item_id = item_ref.id;
                                 let impl_item = hir.impl_item(impl_item_id);
-                                if impl_item.vis.node.is_pub() {
-                                    let defpath = tcx.def_path(item_ref.id.def_id.to_def_id());
+                                let impl_item_def_id = impl_item.hir_id().owner.def_id.to_def_id();
+
+                                if tcx.visibility(impl_item_def_id).is_public() {
+                                    let defpath = tcx.def_path(impl_item_def_id);
                                     // for (parent_hir_id, _) in hir.parent_owner_iter(item.hir_id()) {
                                     //     let parent_item =
                                     //         hir.expect_item(hir.local_def_id(parent_hir_id));
@@ -117,7 +124,8 @@ impl EntryCollectorCallbacks {
                     // The visibility of a foreign function is stored in `ForeignItem`, so we get it through its id
                     let foreign_item_id = itemref.id;
                     let foreign_item = hir.foreign_item(foreign_item_id);
-                    if foreign_item.vis.node.is_pub() {
+                    let foreign_item_def_id = foreign_item.hir_id().owner.def_id.to_def_id();
+                    if tcx.visibility(foreign_item_def_id).is_public() {
                         debug!("Public FFI Fn: {:?}, {:?}", itemref.id, itemref.ident);
                         pub_funcs.insert(String::from(&*(itemref.ident.as_str())));
                     }

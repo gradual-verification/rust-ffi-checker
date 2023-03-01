@@ -15,8 +15,6 @@ extern crate rustc_interface;
 extern crate rustc_middle;
 extern crate rustc_session;
 
-// use log::info;
-
 use rustc_session::config::ErrorOutputType;
 use rustc_session::early_error;
 
