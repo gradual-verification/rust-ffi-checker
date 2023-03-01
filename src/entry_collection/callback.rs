@@ -33,9 +33,9 @@ impl EntryCollectorCallbacks {
 impl rustc_driver::Callbacks for EntryCollectorCallbacks {
     /// Called after analysis. Return value instructs the compiler whether to
     /// continue the compilation afterwards (defaults to `Compilation::Continue`)
-    fn after_analysis<'compiler, 'tcx>(
+    fn after_analysis<'tcx>(
         &mut self,
-        compiler: &'compiler interface::Compiler,
+        compiler: &interface::Compiler,
         queries: &'tcx Queries<'tcx>,
     ) -> Compilation {
         queries
@@ -49,10 +49,10 @@ impl rustc_driver::Callbacks for EntryCollectorCallbacks {
 
 
 impl EntryCollectorCallbacks {
-    fn run_analysis<'tcx, 'compiler>(
+    fn run_analysis(
         &mut self,
-        _compiler: &'compiler interface::Compiler,
-        tcx: TyCtxt<'tcx>,
+        _compiler: &interface::Compiler,
+        tcx: TyCtxt<'_>,
     ) {
         // Skip some crates that we are not interested in
         let crate_name =
@@ -84,7 +84,7 @@ impl EntryCollectorCallbacks {
                     rustc_hir::ItemKind::Fn { .. } => {
                         if visibility.is_public() {
                             debug!("Public Fn: {:?}, {:?}", def_id, item.ident);
-                            pub_funcs.insert(String::from(&*(item.ident.as_str())));
+                            pub_funcs.insert(String::from(item.ident.as_str()));
                         }
                     }
                     rustc_hir::ItemKind::Impl(impl_inner) => {
@@ -108,7 +108,7 @@ impl EntryCollectorCallbacks {
                                         item_ref.ident,
                                         defpath.to_filename_friendly_no_crate()
                                     );
-                                    pub_funcs.insert(String::from(&*(item_ref.ident.as_str())));
+                                    pub_funcs.insert(String::from(item_ref.ident.as_str()));
                                 }
                             }
                         }
@@ -119,7 +119,7 @@ impl EntryCollectorCallbacks {
             if let rustc_hir::ItemKind::ForeignMod { abi: _, items } = item.kind {
                 for itemref in items {
                     debug!("FFI: {:?}, {:?}", itemref.id, itemref.ident);
-                    ffi_funcs.insert(String::from(&*(itemref.ident.as_str())));
+                    ffi_funcs.insert(String::from(itemref.ident.as_str()));
 
                     // The visibility of a foreign function is stored in `ForeignItem`, so we get it through its id
                     let foreign_item_id = itemref.id;
@@ -127,7 +127,7 @@ impl EntryCollectorCallbacks {
                     let foreign_item_def_id = foreign_item.hir_id().owner.def_id.to_def_id();
                     if tcx.visibility(foreign_item_def_id).is_public() {
                         debug!("Public FFI Fn: {:?}, {:?}", itemref.id, itemref.ident);
-                        pub_funcs.insert(String::from(&*(itemref.ident.as_str())));
+                        pub_funcs.insert(String::from(itemref.ident.as_str()));
                     }
                 }
             }

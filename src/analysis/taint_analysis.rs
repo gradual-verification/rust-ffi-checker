@@ -25,7 +25,7 @@ pub struct StaticAnalysis {
 impl StaticAnalysis {
     pub fn new(context: Rc<RefCell<GlobalContext>>) -> Self {
         Self {
-            context: context.clone(),
+            context: context,
         }
     }
 
@@ -49,7 +49,7 @@ impl StaticAnalysis {
                     func_analysis.iterate_to_fixpoint();
                 }
             }
-            if found == false {
+            if !found {
                 warn!("LLVM bitcode for entry point: {} is not found", entry_func);
             }
         }
@@ -121,8 +121,7 @@ impl FuncAnalysis {
         // Clear and initialize the call stack, since we want to launch a new function analysis
         // context.borrow_mut().call_stack = vec![utils::demangle_name(func_name)];
 
-        if let Some(function) = context.borrow().functions.get(func_name) {
-            Some(Self {
+        context.borrow().functions.get(func_name).map(|function| Self {
                 context: context.clone(),
                 init_state: BlockState::default(),
                 function: function.clone(),
@@ -131,10 +130,6 @@ impl FuncAnalysis {
                 depth: 1,
                 iteration: 0,
             })
-        } else {
-            // Cannot find the LLVM bitcode for `func_name`, abort
-            None
-        }
     }
 
     /// Initialize a function analysis given the initial state `init`
@@ -174,7 +169,7 @@ impl FuncAnalysis {
         while let Some(bb) = worklist.pop_front() {
             self.analyze_basic_block(&bb);
             let new_state = self.get_state_from_predecessors(&bb);
-            if old_state.get(&bb.name) == None || !(new_state <= old_state.get(&bb.name).unwrap()) {
+            if old_state.get(&bb.name).is_none() || !(new_state <= old_state.get(&bb.name).unwrap()) {
                 debug!("old: {:?}", old_state);
                 old_state.insert(bb.name.clone(), new_state);
                 debug!("new: {:?}", old_state);

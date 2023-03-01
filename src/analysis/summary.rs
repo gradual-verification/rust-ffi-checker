@@ -8,17 +8,12 @@ pub type Summary = (BlockState, MemoryState);
 
 /// Store the summaries that have been computed
 /// Given a `SummaryKey`, it returns the corresponding `BlockState` if possible
+#[derive(Default)]
 pub struct SummaryCache {
     map: HashMap<SummaryKey, Summary>,
 }
 
-impl Default for SummaryCache {
-    fn default() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-}
+
 
 impl SummaryCache {
     pub fn insert(&mut self, key: &SummaryKey, state: Summary) {

@@ -14,7 +14,7 @@ pub struct Allocation {
 impl Allocation {
     pub fn new(var: Name) -> Self {
         let mut res = BTreeSet::new();
-        res.insert(var.clone());
+        res.insert(var);
         Self { set: res }
     }
 
@@ -110,17 +110,12 @@ impl MemoryState {
 /// The state of a basic block. Mathematically it is a map lattice,
 /// which contains all possible mappings that map from `Allocation` to `MemoryState`.
 #[derive(Clone, PartialEq, Eq)]
+#[derive(Default)]
 pub struct BlockState {
     state: HashMap<Allocation, MemoryState>,
 }
 
-impl Default for BlockState {
-    fn default() -> Self {
-        Self {
-            state: HashMap::new(),
-        }
-    }
-}
+
 
 impl fmt::Debug for BlockState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -159,7 +154,7 @@ impl PartialOrd for BlockState {
                     return None;
                 }
             }
-            return Some(Ordering::Less);
+            Some(Ordering::Less)
         }
     }
 }
@@ -214,16 +209,14 @@ impl BlockState {
                         // If `var` is only in `self`
                         res_state.state.insert(alloc1.clone(), self.state[&alloc1]);
                     }
+                } else if let Some(alloc2) = other.get_allocation(var) {
+                    // If `var` is only in `other`
+                    res_state.state.insert(alloc2.clone(), other.state[&alloc2]);
                 } else {
-                    if let Some(alloc2) = other.get_allocation(var) {
-                        // If `var` is only in `other`
-                        res_state.state.insert(alloc2.clone(), other.state[&alloc2]);
-                    } else {
-                        // If `var` is neither in `self` nor `other`, should be impossible to happen
-                        unreachable!(
-                            "`var` is neither in `self` nor `other`, should be impossible to happen"
-                        );
-                    }
+                    // If `var` is neither in `self` nor `other`, should be impossible to happen
+                    unreachable!(
+                        "`var` is neither in `self` nor `other`, should be impossible to happen"
+                    );
                 }
             }
         }
@@ -242,7 +235,7 @@ impl BlockState {
                     self.state.remove(&alloc);
                     if let Name::Name(box name) = var {
                         // If `var` has a string name
-                        let v: Vec<_> = name.split(".").collect();
+                        let v: Vec<_> = name.split('.').collect();
                         let mut s = String::new();
                         for elem in v {
                             s.push_str(elem);
@@ -261,7 +254,7 @@ impl BlockState {
                     // "%a.really.long.identifier", "%a.really.long", "%a.really", and "%a"
                     if let Name::Name(box name) = var {
                         // If `var` has a string name
-                        let v: Vec<_> = name.split(".").collect();
+                        let v: Vec<_> = name.split('.').collect();
                         let mut s = String::new();
                         for elem in v {
                             s.push_str(elem);
@@ -283,7 +276,7 @@ impl BlockState {
                 return *mem_state;
             }
         }
-        return MemoryState::Untainted;
+        MemoryState::Untainted
     }
 
     pub fn get_allocation(&self, var: &Name) -> Option<Allocation> {
@@ -292,7 +285,7 @@ impl BlockState {
                 return Some(alloc.clone());
             }
         }
-        return None;
+        None
     }
 
     pub fn is_tainted(&self, var: &Name) -> bool {
@@ -348,17 +341,12 @@ impl BlockState {
 /// In the implementation, for each basic block, we store its `BlockState`.
 /// Basic blocks are identified by their names.
 #[derive(Clone, PartialEq)]
+#[derive(Default)]
 pub struct AbstractDomain {
     map: HashMap<Name, BlockState>,
 }
 
-impl Default for AbstractDomain {
-    fn default() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-}
+
 
 impl fmt::Debug for AbstractDomain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -373,7 +361,7 @@ impl PartialOrd for AbstractDomain {
             Some(Ordering::Equal)
         } else {
             for (bb, state1) in &self.map {
-                if let Some(state2) = other.map.get(&bb) {
+                if let Some(state2) = other.map.get(bb) {
                     if !(state1 <= state2) {
                         return None;
                     }

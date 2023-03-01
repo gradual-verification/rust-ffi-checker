@@ -37,7 +37,7 @@ impl GlobalContext {
         }
 
         Self {
-            functions: functions,
+            functions,
             summary_cache: SummaryCache::default(),
             analysis_option: options,
             known_names: KnownNames::default(),

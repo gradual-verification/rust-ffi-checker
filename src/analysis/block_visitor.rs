@@ -246,7 +246,7 @@ impl<'a> BlockVisitor<'a> {
             }
             return None;
         }
-        return None;
+        None
     }
 
     /// Get the function name from `llvm_ir::terminator::Invoke`
@@ -264,7 +264,7 @@ impl<'a> BlockVisitor<'a> {
             }
             return None;
         }
-        return None;
+        None
     }
 
     /// Determine whether a function is an FFI function
@@ -316,7 +316,7 @@ impl<'a> BlockVisitor<'a> {
     ) {
         debug!(
             "visit function: {}, arguments: {:?}, dest: {:?}",
-            utils::demangle_name(&func_name),
+            utils::demangle_name(func_name),
             arguments,
             dest
         );
@@ -349,7 +349,7 @@ impl<'a> BlockVisitor<'a> {
         if let Some((end_state, ret_state)) = self.get_function_summary(&function, init) {
             // First, set the state of the return value
             if let Some(name) = dest {
-                self.state.set_tainted(&name, ret_state);
+                self.state.set_tainted(name, ret_state);
             }
 
             // Second, propagate the state of parameters
@@ -495,12 +495,12 @@ impl<'a> BlockVisitor<'a> {
             KnownNameType::AllocSource => {
                 debug!(
                     "Find allocation source: {}, arguments: {:?}, dest: {:?}",
-                    utils::demangle_name(&func_name),
+                    utils::demangle_name(func_name),
                     arguments,
                     dest
                 );
                 if let Some(name) = dest {
-                    self.state.set_tainted(&name, MemoryState::Tainted);
+                    self.state.set_tainted(name, MemoryState::Tainted);
                 }
             }
             KnownNameType::FreeSink => {
@@ -510,7 +510,7 @@ impl<'a> BlockVisitor<'a> {
                 );
                 // Check whether any argument is tainted
                 if arguments.iter().any(|(operand, _)| match operand {
-                    Operand::LocalOperand { name, .. } => self.state.is_tainted(&name),
+                    Operand::LocalOperand { name, .. } => self.state.is_tainted(name),
                     _ => false,
                 }) {
                     self.generate_diagnosis(
@@ -537,7 +537,7 @@ impl<'a> BlockVisitor<'a> {
             KnownNameType::Ignore => {
                 debug!(
                     "Skip should-be-ignored function: {}",
-                    utils::demangle_name(&func_name)
+                    utils::demangle_name(func_name)
                 );
             }
         }
@@ -554,7 +554,7 @@ impl<'a> BlockVisitor<'a> {
                 // Syntax of `llvm.memcpy` intrinsic:
                 // declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>, i64 <len>, i1 <isvolatile>)
                 assert!(arguments.len() == 4);
-                assert!(*dest == None);
+                assert!(dest.is_none());
 
                 // Extract the 1st and 2nd arguments, and propagate taint
                 if let (
@@ -586,7 +586,7 @@ impl<'a> BlockVisitor<'a> {
                 // %1 = invoke { [0 x i8]*, i64 } @"_ZN68_$LT$alloc..string..String$u20$as$u20$core..ops..deref..DerefMut$GT$9deref_mut17ha158855bd2b05e71E"(%"alloc::string::String"* align 8 dereferenceable(24) %s)
                 // FIXME: seems like # of arguments can be > 1, comment this line for the time being
                 // assert!(arguments.len() == 1);
-                assert!(*dest != None);
+                assert!(dest.is_some());
                 if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                     self.state.propagate_taint(name, dest.as_ref().unwrap());
                 }
@@ -595,7 +595,7 @@ impl<'a> BlockVisitor<'a> {
                 // E.g., %14 = call nonnull i64* @"_ZN5alloc2rc11Rc$LT$T$GT$3new17h18438c0fa384bab7E"(i32* noalias nonnull align 4 %13), !dbg !3037
                 // It passes the first argument to the return value
                 assert!(arguments.len() == 1);
-                assert!(*dest != None);
+                assert!(dest.is_some());
                 if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                     self.state.propagate_taint(name, dest.as_ref().unwrap());
                 }
@@ -607,7 +607,7 @@ impl<'a> BlockVisitor<'a> {
 
                 // Seems like the return value can be None, so we check it here
                 // assert!(*dest != None);
-                if *dest != None {
+                if dest.is_some() {
                     if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                         self.state.propagate_taint(name, dest.as_ref().unwrap());
                     }
@@ -617,7 +617,7 @@ impl<'a> BlockVisitor<'a> {
                 // E.g., %p = call i8* @_ZN3std3ffi5c_str7CString8into_raw17he8bf9ee6170c88bfE(i8* noalias nonnull align 1 %s.0, i64 %s.1), !dbg !986
                 // It forgets the first argument and passes the first argument to the return value
                 assert!(arguments.len() == 2);
-                assert!(*dest != None);
+                assert!(dest.is_some());
                 if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                     if self.state.get_memory_state(name) < MemoryState::Forgotten {
                         self.state.set_tainted(name, MemoryState::Forgotten);
@@ -627,8 +627,8 @@ impl<'a> BlockVisitor<'a> {
             }
             Intrinsic::CStringAsCStr => {
                 // Borrow the first argument and pass it to the return value
-                assert!(arguments.len() >= 1);
-                assert!(*dest != None);
+                assert!(!arguments.is_empty());
+                assert!(dest.is_some());
                 if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                     if self.state.get_memory_state(name) < MemoryState::Borrowed {
                         self.state.set_tainted(name, MemoryState::Borrowed);
@@ -643,7 +643,7 @@ impl<'a> BlockVisitor<'a> {
                 // assert!(*dest == None);
 
                 // FIXME: The arguments can be empty, just ignore this case for now...
-                if arguments.len() >= 1 {
+                if !arguments.is_empty() {
                     if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                         if self.state.get_memory_state(name) < MemoryState::Forgotten {
                             self.state.set_tainted(name, MemoryState::Forgotten);
@@ -660,7 +660,7 @@ impl<'a> BlockVisitor<'a> {
                 // Forget the first argument and pass the first argument to the return value
                 // E.g., %_4 = call { i32, i32 }* @"_ZN5alloc5boxed16Box$LT$T$C$A$GT$8into_raw17hfcf7bd0c971663edE"({ i32, i32 }* noalias nonnull align 4 %20), !dbg !991
                 // assert!(arguments.len() == 1);
-                assert!(*dest != None);
+                assert!(dest.is_some());
                 if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                     if self.state.get_memory_state(name) < MemoryState::Forgotten {
                         self.state.set_tainted(name, MemoryState::Forgotten);
@@ -672,7 +672,7 @@ impl<'a> BlockVisitor<'a> {
                 // Forget the second argument
                 // E.g., invoke void @"_ZN5alloc3vec16Vec$LT$T$C$A$GT$14into_raw_parts17h3189686ebda467e7E"({ i32*, i64, i64 }* sret({ i32*, i64, i64 }) %b, %"alloc::vec::Vec<i32>"* %_21)
                 assert!(arguments.len() == 2);
-                assert!(*dest == None);
+                assert!(dest.is_none());
                 if let Operand::LocalOperand { name, .. } = &arguments[1].0 {
                     if self.state.get_memory_state(name) < MemoryState::Forgotten {
                         self.state.set_tainted(name, MemoryState::Forgotten);
@@ -681,8 +681,8 @@ impl<'a> BlockVisitor<'a> {
             }
             Intrinsic::VecAsPtr => {
                 // Borrow the first argument, and pass it to the return value
-                assert!(arguments.len() >= 1);
-                assert!(*dest != None);
+                assert!(!arguments.is_empty());
+                assert!(dest.is_some());
                 if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                     if self.state.get_memory_state(name) < MemoryState::Borrowed {
                         self.state.set_tainted(name, MemoryState::Borrowed);
@@ -694,13 +694,13 @@ impl<'a> BlockVisitor<'a> {
                 // Pass the first argument to the return value
                 // This function converts a forgotten memory back to Rust,
                 // so if the first argument is forgotten, change it to `Alloc`
-                assert!(arguments.len() >= 1);
+                assert!(!arguments.is_empty());
                 // assert!(*dest != None);
                 if let Operand::LocalOperand { name, .. } = &arguments[0].0 {
                     if self.state.get_memory_state(name) == MemoryState::Forgotten {
                         self.state.set_tainted(name, MemoryState::Tainted);
                     }
-                    if *dest != None {
+                    if dest.is_some() {
                         self.state.propagate_taint(name, dest.as_ref().unwrap());
                     }
                 }
@@ -734,7 +734,7 @@ impl<'a> BlockVisitor<'a> {
             // Check whether any argument is tainted
             for (arg_operand, _) in &call.arguments {
                 if let Operand::LocalOperand { name, .. } = arg_operand {
-                    match self.state.get_memory_state(&name) {
+                    match self.state.get_memory_state(name) {
                         MemoryState::Tainted => {
                             self.generate_diagnosis(
                                 BugInfo::new(
@@ -797,7 +797,7 @@ impl<'a> BlockVisitor<'a> {
         } else if Self::is_function_pointer_from_invoke(invoke) {
             for (arg_operand, _) in &invoke.arguments {
                 if let Operand::LocalOperand { name, .. } = arg_operand {
-                    match self.state.get_memory_state(&name) {
+                    match self.state.get_memory_state(name) {
                         MemoryState::Tainted => {
                             self.generate_diagnosis(
                                 BugInfo::new(
@@ -868,7 +868,7 @@ impl<'a> BlockVisitor<'a> {
             }
             return false;
         }
-        return false;
+        false
     }
 
     /// Determine whether the function in the `Invoke` instruction is a function pointer
@@ -886,7 +886,7 @@ impl<'a> BlockVisitor<'a> {
             }
             return false;
         }
-        return false;
+        false
     }
 
     fn get_function_summary(
@@ -913,7 +913,7 @@ impl<'a> BlockVisitor<'a> {
 
             // Initialize initial state for tainted parameters
             let mut init_state = BlockState::default();
-            let callee_params: Vec<_> = function.parameters.iter().cloned().collect();
+            let callee_params: Vec<_> = function.parameters.to_vec();
             // `arg_map` has type `Vec<(&Option<MemoryState>, Parameter)>`
             let arg_map = init.iter().zip(callee_params).collect::<Vec<_>>();
 

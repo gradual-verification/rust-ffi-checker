@@ -101,7 +101,7 @@ impl KnownNames {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     /// If `func_name` is a LLVM intrinsic, return the `LLVMIntrinsic` variant. Otherwise return `None`
